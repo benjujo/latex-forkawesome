@@ -2,27 +2,26 @@
 # -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup
-from urllib import urlopen
-from StringIO import StringIO
-import gzip
+import requests
 import re
+import sys
 
-CHEATSHEET_URL = 'http://fortawesome.github.io/Font-Awesome/cheatsheet/'
-OUTPUT_FILE = 'fontawesome.sty'
+CHEATSHEET_URL = 'https://forkaweso.me/Fork-Awesome/cheatsheet/'
+OUTPUT_FILE = 'forkawesome.sty'
 
 OUTPUT_HEADER = r'''
-%% Copyright 2015-2017 Claud D. Park <posquit0.bj@gmail.com>
-%% It is based on furl's latex-fontawesome project.
+%% Based on posquit0 latex-fontawesome, which is
+%% based on furl's latex-fontawesome project.
 
 % Identify this package.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{fontawesome}[2017/10/22 v4.7.0 font awesome icons]
+\ProvidesPackage{forkawesome}[2021/11/04 v1.2.0 fork awesome icons]
 
 % Requirements to use.
 \usepackage{fontspec}
 
-% Define shortcut to load the Font Awesome font.
-\newfontfamily{\FA}{FontAwesome}
+% Define shortcut to load the Fork Awesome font.
+\newfontfamily{\FA}{ForkAwesome}
 % Generic command displaying an icon by its name.
 \newcommand*{\faicon}[1]{{
   \FA\csname faicon@#1\endcsname
@@ -34,29 +33,20 @@ OUTPUT_LINE = '\expandafter\def\csname faicon@%(name)s\endcsname '
 OUTPUT_LINE += '{\symbol{"%(symbol)s}} \def\%(camel_name)s '
 OUTPUT_LINE += '{{\FA\csname faicon@%(name)s\endcsname}}\n'
 
-try:
-    response = urlopen(CHEATSHEET_URL)
-    if response.info().get('Content-Encoding') == 'gzip':
-        buf = StringIO(response.read())
-        f = gzip.GzipFile(fileobj=buf)
-        data = f.read()
-    else:
-        data = response.read()
-    soup = BeautifulSoup(data, 'html.parser')
-
-    cheatsheet = soup.select('div.row > div')
-except:
-    import sys
-    sys.exit(0)
+response = requests.get(CHEATSHEET_URL)
+data = response.text
+soup = BeautifulSoup(data, 'html.parser')
+cheatsheet = soup.select('div.row > div')
 
 with open(OUTPUT_FILE, 'w') as w:
     w.write(OUTPUT_HEADER)
     for line in cheatsheet:
         data = line.text
         if 'fa' not in data:
+            print(f"Unexpected data: {data}")
             continue
 
-        data = ' '.join(s.strip() for s in data.split())
+        data = ' '.join(data.split())
         # Expects to find 'fa-NAME' ending with " " (single space)
         name = re.findall(r'fa-(\S+)', data)[0]
         # Expects to find 'xfSYMBOL' ending with ;
@@ -66,6 +56,7 @@ with open(OUTPUT_FILE, 'w') as w:
         camel_name = 'fa' + ''.join(camel_case)
 
         if re.findall('[0-9]', name):
+            print(f"Cannot handle icon: {name}")
             continue
 
         w.write(
